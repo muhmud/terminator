@@ -54,7 +54,7 @@ class SqlMode(plugin.MenuItem):
         # Check for F5
         if (event.keyval == 65474):
             terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x7e')
-            time.sleep(0.15)
+            time.sleep(0.2)
             terminal.emit('print', 'next', '\n#q\n\\. /tmp/buffer.sql\n')
 
     def setPostgresqlMode(self, _widget, terminal):
@@ -66,23 +66,40 @@ class SqlMode(plugin.MenuItem):
 
     def psql_keypress(self, terminal, event):
         # Check for F5
-        if (event.keyval == 65474):
+        if (event.keyval == 65474 and event.state == 16):
             terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x7e')
-            time.sleep(0.17)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /ram/buffer.sql\n')
         # Check for Alt + F1
         if (event.keyval == 65470 and event.state == 24):
-            # ^[[1;3P
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x3b\x33\x50')
-            time.sleep(0.17)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            # ^[O1;3P
+            terminal.vte.feed_child_binary(b'\x1b\x4f\x31\x3b\x33\x50')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /ram/buffer.sql\n')
         # Check for Alt + F2
         if (event.keyval == 65471 and event.state == 24):
-            # ^[[1;3Q
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x3b\x33\x51')
-            time.sleep(0.17)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
-            
+            # ^[O1;3Q
+            terminal.vte.feed_child_binary(b'\x1b\x4f\x31\x3b\x33\x51')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /ram/buffer.sql\n')
+        # Check for Alt + F5
+        if (event.keyval == 65474 and event.state == 24):
+            # ^[[15;3~
+            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x3b\x33\x7e')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /ram/buffer.sql\n')
+        # Check for Alt + Space
+        if (event.keyval == 32 and event.state == 24):
+            # ^[ 
+            terminal.vte.feed_child_binary(b'\x1b\x20')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /ram/buffer.sql\n')
+        # Check for Ctrl + Enter
+        if (event.keyval == 65293 and event.state == 20):
+            # ^[[24;9~
+            terminal.vte.feed_child_binary(b'\x1b\x5b\x32\x34\x3b\x39\x7e')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /ram/buffer.sql\n')
 
     def setSQLServerMode(self, _widget, terminal):
         """Set Sql Mode to SQL Server"""
