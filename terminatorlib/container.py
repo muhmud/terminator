@@ -1,10 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # Terminator by Chris Jones <cmsj@tenshu.net>
 # GPL v2 only
 """container.py - classes necessary to contain Terminal widgets"""
 
-import gobject
-import gtk
+from gi.repository import GObject
+from gi.repository import Gtk
 
 from factory import Factory
 from config import Config
@@ -32,7 +32,7 @@ class Container(object):
 
     def register_signals(self, widget):
         """Register gobject signals in a way that avoids multiple inheritance"""
-        existing = gobject.signal_list_names(widget)
+        existing = GObject.signal_list_names(widget)
         for signal in self.signals:
             if signal['name'] in existing:
                 dbg('Container:: skipping signal %s for %s, already exists' % (
@@ -41,7 +41,7 @@ class Container(object):
                 dbg('Container:: registering signal for %s on %s' % 
                         (signal['name'], widget))
                 try:
-                    gobject.signal_new(signal['name'],
+                    GObject.signal_new(signal['name'],
                                        widget,
                                        signal['flags'],
                                        signal['return_type'],
@@ -127,6 +127,7 @@ class Container(object):
             return(False)
 
         self.terminator.deregister_terminal(widget)
+        widget.close()
         self.terminator.group_hoover()
         return(True)
 
@@ -158,45 +159,52 @@ class Container(object):
         
         # skip this dialog if applicable
         if self.config['suppress_multiple_term_dialog']:
-            return gtk.RESPONSE_ACCEPT
+            return Gtk.ResponseType.ACCEPT
         
-        dialog = gtk.Dialog(_('Close?'), window, gtk.DIALOG_MODAL)
-        dialog.set_has_separator(False)
+        dialog = Gtk.Dialog(_('Close?'), window, Gtk.DialogFlags.MODAL)
         dialog.set_resizable(False)
     
-        dialog.add_button(gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT)
-        c_all = dialog.add_button(gtk.STOCK_CLOSE, gtk.RESPONSE_ACCEPT)
+        dialog.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.REJECT)
+        c_all = dialog.add_button(Gtk.STOCK_CLOSE, Gtk.ResponseType.ACCEPT)
         c_all.get_children()[0].get_children()[0].get_children()[1].set_label(
                 _('Close _Terminals'))
     
-        primary = gtk.Label(_('<big><b>Close multiple terminals?</b></big>'))
+        primary = Gtk.Label(label=_('<big><b>Close multiple terminals?</b></big>'))
         primary.set_use_markup(True)
         primary.set_alignment(0, 0.5)
-        secondary = gtk.Label(_('This %s has several terminals open. Closing \
-the %s will also close all terminals within it.') % (reqtype, reqtype))
+        if reqtype == 'window':
+            label_text = _('This window has several terminals open. Closing \
+the window will also close all terminals within it.')
+        elif reqtype == 'tab':
+            label_text = _('This tab has several terminals open. Closing \
+the tab will also close all terminals within it.')
+        else:
+            label_text = ''
+        secondary = Gtk.Label(label=label_text)
         secondary.set_line_wrap(True)
                     
-        labels = gtk.VBox()
+        labels = Gtk.VBox()
         labels.pack_start(primary, False, False, 6)
         labels.pack_start(secondary, False, False, 6)
     
-        image = gtk.image_new_from_stock(gtk.STOCK_DIALOG_WARNING,
-                                         gtk.ICON_SIZE_DIALOG)
+        image = Gtk.Image.new_from_stock(Gtk.STOCK_DIALOG_WARNING,
+                                         Gtk.IconSize.DIALOG)
         image.set_alignment(0.5, 0)
     
-        box = gtk.HBox()
+        box = Gtk.HBox()
         box.pack_start(image, False, False, 6)
         box.pack_start(labels, False, False, 6)
         dialog.vbox.pack_start(box, False, False, 12)
 
-        checkbox = gtk.CheckButton(_("Do not show this message next time"))
-        dialog.vbox.pack_end(checkbox)
+        checkbox = Gtk.CheckButton(_("Do not show this message next time"))
+        dialog.vbox.pack_end(checkbox, True, True, 0)
     
         dialog.show_all()
 
         result = dialog.run()
         
         # set configuration
+        self.config.base.reload()
         self.config['suppress_multiple_term_dialog'] = checkbox.get_active()
         self.config.save()
 
@@ -256,18 +264,42 @@ the %s will also close all terminals within it.') % (reqtype, reqtype))
             if hasattr(position, '__iter__'):
                 position = ':'.join([str(x) for x in position])
             layout['position'] = position
+        
+        if hasattr(self, 'ismaximised'):
+            layout['maximised'] = self.ismaximised
+        
+        if hasattr(self, 'isfullscreen'):
+            layout['fullscreen'] = self.isfullscreen
+        
+        if hasattr(self, 'ratio'):
+            layout['ratio'] = self.ratio
 
         if hasattr(self, 'get_size'):
             layout['size'] = self.get_size()
 
-        labels = []
+        if hasattr(self, 'title'):
+            layout['title'] = self.title.text
+
         if mytype == 'Notebook':
+            labels = []
+            last_active_term = []
             for tabnum in xrange(0, self.get_n_pages()):
                 page = self.get_nth_page(tabnum)
                 label = self.get_tab_label(page)
                 labels.append(label.get_custom_label())
-        if len(labels) > 0:
+                last_active_term.append(self.last_active_term[self.get_nth_page(tabnum)])
             layout['labels'] = labels
+            layout['last_active_term'] = last_active_term
+            layout['active_page'] = self.get_current_page()
+        else:
+            if hasattr(self, 'last_active_term') and self.last_active_term is not None:
+                layout['last_active_term'] = self.last_active_term
+
+        if mytype == 'Window':
+            if self.uuid == self.terminator.last_active_window:
+                layout['last_active_window'] = True
+            else:
+                layout['last_active_window'] = False
 
         name = 'child%d' % count
         count = count + 1

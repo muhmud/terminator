@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 #  Terminator - multiple gnome terminals in one window
 #   Copyright (C) 2006-2010  cmsj@tenshu.net
 #
@@ -23,9 +23,11 @@ keyboard shortcuts.
 """
 
 import re
+from gi.repository import Gtk, Gdk
+
+# XXXXX
+from util import dbg, err
 import gtk
-import array
-from util import err, dbg
 
 class KeymapError(Exception):
     """Custom exception for errors in keybinding configurations"""
@@ -35,33 +37,37 @@ class Keybindings:
     """Class to handle loading and lookup of Terminator keybindings"""
 
     modifiers = {
-        'ctrl':     gtk.gdk.CONTROL_MASK,
-        'control':  gtk.gdk.CONTROL_MASK,
-        'primary':  gtk.gdk.CONTROL_MASK,
-        'shift':    gtk.gdk.SHIFT_MASK,
-        'alt':      gtk.gdk.MOD1_MASK,
-        'super':    gtk.gdk.SUPER_MASK,
-        'altgr':    144
+        'ctrl':     Gdk.ModifierType.CONTROL_MASK,
+        'control':  Gdk.ModifierType.CONTROL_MASK,
+        'primary':  Gdk.ModifierType.CONTROL_MASK,
+        'shift':    Gdk.ModifierType.SHIFT_MASK,
+        'alt':      Gdk.ModifierType.MOD1_MASK,
+        'super':    Gdk.ModifierType.SUPER_MASK,
+        'hyper':    Gdk.ModifierType.HYPER_MASK,
     }
 
     empty = {}
     keys = None
-    codes = None
     _masks = None
     _lookup = None
+
+    # XXXXX
     _codeMasks = None
     _lookupCode = None
 
+    # XXXXX
     def __init__(self):
-        self.keymap = gtk.gdk.keymap_get_default()
+        self.keymap = Gdk.Keymap.get_default()
         self.configure({}, {})
 
+    # XXXXX
     def configure(self, bindings, codes):
         """Accept new bindings and reconfigure with them"""
         self.keys = bindings
         self.codes = codes
         self.reload()
 
+    # XXXXX
     def _reload(self, lookup, masks, bindings, action):
         if not isinstance(bindings, tuple):
             bindings = (bindings,)
@@ -77,22 +83,23 @@ class Keybindings:
             except KeymapError as e:
                 err ("_reload failed to parse binding '%s': %s" % (binding, e))
             else:
-                if mask & gtk.gdk.SHIFT_MASK:
-                    if keyval == gtk.keysyms.Tab:
-                        keyval = gtk.keysyms.ISO_Left_Tab
-                        mask &= ~gtk.gdk.SHIFT_MASK
+                if mask & Gdk.ModifierType.SHIFT_MASK:
+                    if keyval == Gdk.KEY_Tab:
+                        keyval = Gdk.KEY_ISO_Left_Tab
+                        mask &= ~Gdk.ModifierType.SHIFT_MASK
                     else:
-                        keyvals = gtk.gdk.keyval_convert_case(keyval)
+                        keyvals = Gdk.keyval_convert_case(keyval)
                         if keyvals[0] != keyvals[1]:
                             keyval = keyvals[1]
-                            mask &= ~gtk.gdk.SHIFT_MASK
+                            mask &= ~Gdk.ModifierType.SHIFT_MASK
                 else:
-                    keyval = gtk.gdk.keyval_to_lower(keyval)
+                    keyval = Gdk.keyval_to_lower(keyval)
                 lookup.setdefault(mask, {})
                 lookup[mask][keyval] = action
                 masks |= mask
         return masks
-        
+
+    # XXXXX
     def reload(self):
         """Parse bindings and mangle into an appropriate form"""
         self._lookupCode = {}
@@ -117,7 +124,7 @@ class Keybindings:
         key = re.sub(MODIFIER, '', binding)
         if key == '':
             raise KeymapError('No key found')
-        keyval = gtk.gdk.keyval_from_name(key)
+        keyval = Gdk.keyval_from_name(key)
         if keyval == 0:
             raise KeymapError("Key '%s' is unrecognised" % key)
         return (keyval, mask)
@@ -132,28 +139,32 @@ class Keybindings:
     def lookup(self, event):
         """Translate a keyboard event into a mapped key"""
         try:
-            keyval, _egp, _lvl, consumed = self.keymap.translate_keyboard_state(
+            _found, keyval, _egp, _lvl, consumed = self.keymap.translate_keyboard_state(
                                               event.hardware_keycode, 
-                                              event.state & ~gtk.gdk.LOCK_MASK, 
+                                              Gdk.ModifierType(event.get_state() & ~Gdk.ModifierType.LOCK_MASK),
                                               event.group)
         except TypeError:
             err ("keybindings.lookup failed to translate keyboard event: %s" % 
                      dir(event))
             return None
+
+        # XXXXX
         dbg("keys>>>>>> %d, %d" % (event.state, event.keyval))
         if (event.state == 128 and event.keyval == 65289):
             return ("tab_stack_down")
         if (event.state == 129 and event.keyval == 65056):
             return ("tab_stack_up")
-        mask = (event.state & ~consumed) & self._masks
+        
+        mask = (event.get_state() & ~consumed) & self._masks
         return self._lookup.get(mask, self.empty).get(keyval, None)
 
+    # XXXXX
     def lookupCode(self, event):
         """Translate a keyboard event into a key code"""
         try:
             keyval, _egp, _lvl, consumed = self.keymap.translate_keyboard_state(
                                               event.hardware_keycode, 
-                                              event.state & ~gtk.gdk.LOCK_MASK, 
+                                              event.state & ~Gdk.ModifierType.LOCK_MASK, 
                                               event.group)
         except TypeError:
             err ("keycode.lookup failed to translate keyboard event: %s" % 

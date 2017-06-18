@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 #    TerminatorConfig - layered config classes
 #    Copyright (C) 2006-2010  cmsj@tenshu.net
 #
@@ -44,6 +44,16 @@ Classes relating to configuration
 {'foo': 'bar'}
 >>> config.plugin_get('testplugin', 'foo')
 'bar'
+>>> config.plugin_get('testplugin', 'foo', 'new')
+'bar'
+>>> config.plugin_get('testplugin', 'algo')
+Traceback (most recent call last):
+...
+KeyError: 'ConfigBase::get_item: unknown key algo'
+>>> config.plugin_get('testplugin', 'algo', 1)
+1
+>>> config.plugin_get('anothertestplugin', 'algo', 500)
+500
 >>> config.get_profile()
 'default'
 >>> config.set_profile('my_first_new_testing_profile')
@@ -69,28 +79,27 @@ from configobj.validate import Validator
 from borg import Borg
 from util import dbg, err, DEBUG, get_config_dir, dict_diff
 
-try:
-    import gconf
-except ImportError:
-    dbg('Unable to import gconf, GNOME defaults unavailable')
+from gi.repository import Gio
 
 DEFAULTS = {
         'global_config':   {
-            'dbus'                  : False,
+            'dbus'                  : True,
             'focus'                 : 'click',
             'handle_size'           : -1,
-            'geometry_hinting'      : True,
+            'geometry_hinting'      : False,
             'window_state'          : 'normal',
             'borderless'            : False,
+            'extra_styling'         : True,
             'tab_position'          : 'top',
+            'broadcast_default'     : 'group',
             'close_button_on_tab'   : True,
             'hide_tabbar'           : False,
             'scroll_tabbar'         : False,
+            'homogeneous_tabbar'    : True,
             'hide_from_taskbar'     : False,
             'always_on_top'         : False,
             'hide_on_lose_focus'    : False,
             'sticky'                : False,
-            'try_posix_regexp'      : platform.system() != 'Linux',
             'use_custom_url_handler': False,
             'custom_url_handler'    : '',
             'disable_real_transparency' : False,
@@ -105,8 +114,12 @@ DEFAULTS = {
             'enabled_plugins'       : ['LaunchpadBugURLHandler',
                                        'LaunchpadCodeURLHandler',
                                        'APTURLHandler'],
-             'suppress_multiple_term_dialog': False,
-             'always_split_with_profile': False,
+            'suppress_multiple_term_dialog': False,
+            'always_split_with_profile': False,
+            'title_use_system_font' : True,
+            'title_font'            : 'Sans 9',
+            'putty_paste_style'     : False,
+            'smart_copy'            : True,
         },
         'keybindings': {
             'zoom_in'          : '<Control>plus',
@@ -130,6 +143,12 @@ DEFAULTS = {
             'paste'            : '<Shift><Control>v',
             'toggle_scrollbar' : '<Shift><Control>s',
             'search'           : '<Shift><Control>f',
+            'page_up'          : '',
+            'page_down'        : '',
+            'page_up_half'     : '',
+            'page_down_half'   : '',
+            'line_up'          : '',
+            'line_down'        : '',
             'close_window'     : '<Shift><Control>q',
             'resize_up'        : '<Shift><Control>Up',
             'resize_down'      : '<Shift><Control>Down',
@@ -154,24 +173,31 @@ DEFAULTS = {
             'full_screen'      : 'F11',
             'reset'            : '<Shift><Control>r',
             'reset_clear'      : '<Shift><Control>g',
-            'hide_window'      : '<Shift><Control><Super>a',
+            'hide_window'      : '<Shift><Control><Alt>a',
             'group_all'        : '<Super>g',
+            'group_all_toggle' : '',
             'ungroup_all'      : '<Shift><Super>g',
             'group_tab'        : '<Super>t',
+            'group_tab_toggle' : '',
             'ungroup_tab'      : '<Shift><Super>t',
             'new_window'       : '<Shift><Control>i',
             'new_terminator'   : '<Super>i',
-            'broadcast_off'    : '',
-            'broadcast_group'  : '',
-            'broadcast_all'    : '',
-            'insert_number'    : '',
-            'insert_padded'    : '',
-            'edit_window_title': ''
+            'broadcast_off'    : '<Alt>o',
+            'broadcast_group'  : '<Alt>g',
+            'broadcast_all'    : '<Alt>a',
+            'insert_number'    : '<Super>1',
+            'insert_padded'    : '<Super>0',
+            'edit_window_title': '<Control><Alt>w',
+            'edit_tab_title'   : '<Control><Alt>a',
+            'edit_terminal_title': '<Control><Alt>x',
+            'layout_launcher'  : '<Alt>l',
+            'next_profile'     : '',
+            'previous_profile' : '', 
+            'help'             : 'F1'
         },
         'profiles': {
             'default':  {
                 'allow_bold'            : True,
-                'antialias'             : True,
                 'audible_bell'          : False,
                 'visible_bell'          : False,
                 'urgent_bell'           : False,
@@ -179,32 +205,30 @@ DEFAULTS = {
                 'background_color'      : '#000000',
                 'background_darkness'   : 0.5,
                 'background_type'       : 'solid',
-                'background_image'      : None,
                 'backspace_binding'     : 'ascii-del',
                 'delete_binding'        : 'escape-sequence',
                 'color_scheme'          : 'grey_on_black',
                 'cursor_blink'          : True,
                 'cursor_shape'          : 'block',
-                'cursor_color'          : '#aaaaaa',
-                'emulation'             : 'xterm',
-                'term'                  : 'xterm',
-                'colorterm'             : 'gnome-terminal',
+                'cursor_color'          : '',
+                'cursor_color_fg'       : True,
+                'term'                  : 'xterm-256color',
+                'colorterm'             : 'truecolor',
                 'font'                  : 'Mono 10',
                 'foreground_color'      : '#aaaaaa',
                 'show_titlebar'         : True,
                 'scrollbar_position'    : "right",
                 'scroll_background'     : True,
                 'scroll_on_keystroke'   : True,
-                'scroll_on_output'      : True,
+                'scroll_on_output'      : False,
                 'scrollback_lines'      : 500,
                 'scrollback_infinite'   : False,
                 'exit_action'           : 'close',
                 'palette'               : '#2e3436:#cc0000:#4e9a06:#c4a000:\
 #3465a4:#75507b:#06989a:#d3d7cf:#555753:#ef2929:#8ae234:#fce94f:\
 #729fcf:#ad7fa8:#34e2e2:#eeeeec',
-                'word_chars'            : '-A-Za-z0-9,./?%&#:_',
+                'word_chars'            : '-,./?%&#:_',
                 'mouse_autohide'        : True,
-                'update_records'        : True,
                 'login_shell'           : False,
                 'use_custom_command'    : False,
                 'custom_command'        : '',
@@ -216,7 +240,7 @@ DEFAULTS = {
                 'force_no_bell'         : False,
                 'cycle_term_tab'        : True,
                 'copy_on_selection'     : False,
-                'alternate_screen_scroll': True,
+                'rewrap_on_resize'      : True,
                 'split_to_group'        : False,
                 'autoclean_groups'      : True,
                 'http_proxy'            : '',
@@ -243,8 +267,8 @@ class Config(object):
     """Class to provide a slightly richer config API above ConfigBase"""
     base = None
     profile = None
-    gconf = None
-    system_font = None
+    system_mono_font = None
+    system_prop_font = None
     system_focus = None
     inhibited = None
     
@@ -252,10 +276,11 @@ class Config(object):
         self.base = ConfigBase()
         self.set_profile(profile)
         self.inhibited = False
+        self.connect_gsetting_callbacks()
 
-    def __getitem__(self, key):
+    def __getitem__(self, key, default=None):
         """Look up a configuration item"""
-        return(self.base.get_item(key, self.profile))
+        return(self.base.get_item(key, self.profile, default=default))
 
     def __setitem__(self, key, value):
         """Set a particular configuration item"""
@@ -311,6 +336,10 @@ class Config(object):
         """Add a new layout"""
         return(self.base.add_layout(name, layout))
 
+    def replace_layout(self, name, layout):
+        """Replace an existing layout"""
+        return(self.base.replace_layout(name, layout)) 
+
     def del_layout(self, layout):
         """Delete a layout"""
         if self.base.layouts.has_key(layout):
@@ -326,46 +355,69 @@ class Config(object):
         """List all configured layouts"""
         return(self.base.layouts.keys())
 
-    def get_system_font(self):
+    def connect_gsetting_callbacks(self):
+        """Get system settings and create callbacks for changes"""
+        dbg("GSetting connects for system changes")
+        # Have to preserve these to self, or callbacks don't happen
+        self.gsettings_interface=Gio.Settings.new('org.gnome.desktop.interface')
+        self.gsettings_interface.connect("changed::font-name", self.on_gsettings_change_event)
+        self.gsettings_interface.connect("changed::monospace-font-name", self.on_gsettings_change_event)
+        self.gsettings_wm=Gio.Settings.new('org.gnome.desktop.wm.preferences')
+        self.gsettings_wm.connect("changed::focus-mode", self.on_gsettings_change_event)
+
+    def get_system_prop_font(self):
         """Look up the system font"""
-        if self.system_font is not None:
-            return(self.system_font)
-        elif 'gconf' not in globals():
+        if self.system_prop_font is not None:
+            return(self.system_prop_font)
+        elif 'org.gnome.desktop.interface' not in Gio.Settings.list_schemas():
             return
         else:
-            if self.gconf is None:
-                self.gconf = gconf.client_get_default()
+            gsettings=Gio.Settings.new('org.gnome.desktop.interface')
+            value = gsettings.get_value('font-name')
+            if value:
+                self.system_prop_font = value.get_string()
+            else:
+                self.system_prop_font = "Sans 10"
+            return(self.system_prop_font)
 
-            value = self.gconf.get(
-                        '/desktop/gnome/interface/monospace_font_name')
-            self.system_font = value.get_string()
-            self.gconf.notify_add(
-                        '/desktop/gnome/interface/monospace_font_name', 
-                        self.on_gconf_notify)
-            return(self.system_font)
+    def get_system_mono_font(self):
+        """Look up the system font"""
+        if self.system_mono_font is not None:
+            return(self.system_mono_font)
+        elif 'org.gnome.desktop.interface' not in Gio.Settings.list_schemas():
+            return
+        else:
+            gsettings=Gio.Settings.new('org.gnome.desktop.interface')
+            value = gsettings.get_value('monospace-font-name')
+            if value:
+                self.system_mono_font = value.get_string()
+            else:
+                self.system_mono_font = "Mono 10"
+            return(self.system_mono_font)
 
     def get_system_focus(self):
         """Look up the system focus setting"""
         if self.system_focus is not None:
             return(self.system_focus)
-        elif 'gconf' not in globals():
+        elif 'org.gnome.desktop.interface' not in Gio.Settings.list_schemas():
             return
         else:
-            if self.gconf is None:
-                self.gconf = gconf.client_get_default()
-
-            value = self.gconf.get('/apps/metacity/general/focus_mode')
+            gsettings=Gio.Settings.new('org.gnome.desktop.wm.preferences')
+            value = gsettings.get_value('focus-mode')
             if value:
                 self.system_focus = value.get_string()
-                self.gconf.notify_add('/apps/metacity/general/focus_mode',
-                        self.on_gconf_notify)
             return(self.system_focus)
 
-    def on_gconf_notify(self, _client, _cnxn_id, _entry, _what):
-        """Handle a gconf watch changing"""
-        dbg('GConf notification received. Invalidating caches')
+    def on_gsettings_change_event(self, settings, key):
+        """Handle a gsetting change event"""
+        dbg('GSetting change event received. Invalidating caches')
         self.system_focus = None
         self.system_font = None
+        self.system_mono_font = None
+        # Need to trigger a reconfigure to change active terminals immediately
+        if "Terminator" not in globals():
+            from terminator import Terminator
+        Terminator().reconfigure()
 
     def save(self):
         """Cause ConfigBase to save our config to file"""
@@ -390,9 +442,11 @@ class Config(object):
         """Get the command line options"""
         return(self.base.command_line_options)
 
-    def plugin_get(self, pluginname, key):
-        """Get a plugin config value"""
-        return(self.base.get_item(key, plugin=pluginname))
+    def plugin_get(self, pluginname, key, default=None):
+        """Get a plugin config value, if doesn't exist
+            return default if specified
+        """
+        return(self.base.get_item(key, plugin=pluginname, default=default))
 
     def plugin_set(self, pluginname, key, value):
         """Set a plugin config value"""
@@ -405,6 +459,10 @@ class Config(object):
     def plugin_set_config(self, plugin, tree):
         """Set a whole config tree for a given plugin"""
         return(self.base.set_plugin(plugin, tree))
+
+    def plugin_del_config(self, plugin):
+        """Delete a whole config tree for a given plugin"""
+        return(self.base.del_plugin(plugin))
 
     def layout_get_config(self, layout):
         """Return a layout"""
@@ -424,7 +482,10 @@ class ConfigBase(Borg):
     keybindings = None
     plugins = None
     layouts = None
+
+    # XXXXX
     keycodes = None
+    
     command_line_options = None
 
     def __init__(self):
@@ -445,7 +506,7 @@ class ConfigBase(Borg):
             self.whined = False
         if self.sections is None:
             self.sections = ['global_config', 'keybindings', 'profiles',
-                             'layouts', 'plugins', 'keycodes']
+                             'layouts', 'plugins']
         if self.global_config is None:
             self.global_config = copy(DEFAULTS['global_config'])
         if self.profiles is None:
@@ -455,12 +516,15 @@ class ConfigBase(Borg):
             self.keybindings = copy(DEFAULTS['keybindings'])
         if self.plugins is None:
             self.plugins = {}
+
+        # XXXXX
+        if self.keycodes is None:
+            self.keycodes = {}
+            
         if self.layouts is None:
             self.layouts = {}
             for layout in DEFAULTS['layouts']:
                 self.layouts[layout] = copy(DEFAULTS['layouts'][layout])
-        if self.keycodes is None:
-            self.keycodes = {}
 
     def defaults_to_configspec(self):
         """Convert our tree of default values into a ConfigObj validation
@@ -497,7 +561,7 @@ class ConfigBase(Borg):
                 continue
             section[key] = 'string(default=%s)' % value
         configspecdata['keybindings'] = section
-        
+
         section = {}
         for key in DEFAULTS['profiles']['default']:
             keytype = DEFAULTS['profiles']['default'][key].__class__.__name__
@@ -506,8 +570,6 @@ class ConfigBase(Borg):
                 keytype = keymap[keytype]
             elif keytype == 'list':
                 value = 'list(%s)' % ','.join(value)
-            if key == 'background_image':
-                keytype = 'string'
             if keytype == 'string':
                 value = '"%s"' % value
 
@@ -528,8 +590,10 @@ class ConfigBase(Borg):
         configspecdata['layouts']['__many__'] = {}
         configspecdata['layouts']['__many__']['__many__'] = section
 
-        configspecdata['plugins'] = {}
+        # XXXXX
         configspecdata['keycodes'] = {}
+        
+        configspecdata['plugins'] = {}
 
         configspec = ConfigObj(configspecdata)
         if DEBUG == True:
@@ -596,14 +660,7 @@ class ConfigBase(Borg):
                     dbg('ConfigBase::load: Processing %s: %s' % (section_name,
                                                                  part))
                     section[part] = parser[section_name][part]
-            elif section_name == 'layouts':
-                for layout in parser[section_name]:
-                    dbg('ConfigBase::load: Processing %s: %s' % (section_name,
-                                                                 layout))
-                    if layout == 'default' and \
-                       parser[section_name][layout] == {}:
-                           continue
-                    section[layout] = parser[section_name][layout]
+            # XXXXX
             elif section_name == 'keycodes':
                 if not parser.has_key(section_name):
                     continue
@@ -612,6 +669,24 @@ class ConfigBase(Borg):
                                                                      keycode,
                                                                      parser[section_name][keycode]))
                     section[keycode] = parser[section_name][keycode]
+            elif section_name == 'layouts':
+                for layout in parser[section_name]:
+                    dbg('ConfigBase::load: Processing %s: %s' % (section_name,
+                                                                 layout))
+                    if layout == 'default' and \
+                       parser[section_name][layout] == {}:
+                           continue
+                    section[layout] = parser[section_name][layout]
+            elif section_name == 'keybindings':
+                if not parser.has_key(section_name):
+                    continue
+                for part in parser[section_name]:
+                    dbg('ConfigBase::load: Processing %s: %s' % (section_name,
+                                                                 part))
+                    if parser[section_name][part] == 'None':
+                        section[part] = None
+                    else:
+                        section[part] = parser[section_name][part]
             else:
                 try:
                     section.update(parser[section_name])
@@ -620,6 +695,11 @@ class ConfigBase(Borg):
                             section_name)
 
         self.loaded = True
+
+    def reload(self):
+        """Force a reload of the base config"""
+        self.loaded = False
+        self.load()
         
     def save(self):
         """Save the config to a file"""
@@ -638,6 +718,12 @@ class ConfigBase(Borg):
             parser['profiles'][profile] = dict_diff(
                     DEFAULTS['profiles']['default'], self.profiles[profile])
 
+        # XXXXX
+        parser['keycodes'] = {}
+        for keycode in self.keycodes:
+            dbg('ConfigBase::save: Processing keycode: %s' % keycode)
+            parser['keycodes'][keycode] = self.keycodes[keycode]
+            
         parser['layouts'] = {}
         for layout in self.layouts:
             dbg('ConfigBase::save: Processing layout: %s' % layout)
@@ -648,11 +734,6 @@ class ConfigBase(Borg):
             dbg('ConfigBase::save: Processing plugin: %s' % plugin)
             parser['plugins'][plugin] = self.plugins[plugin]
 
-        parser['keycodes'] = {}
-        for keycode in self.keycodes:
-            dbg('ConfigBase::save: Processing keycode: %s' % keycode)
-            parser['keycodes'][keycode] = self.keycodes[keycode]
-            
         config_dir = get_config_dir()
         if not os.path.isdir(config_dir):
             os.makedirs(config_dir)
@@ -661,7 +742,7 @@ class ConfigBase(Borg):
         except Exception, ex:
             err('ConfigBase::save: Unable to save config: %s' % ex)
 
-    def get_item(self, key, profile='default', plugin=None):
+    def get_item(self, key, profile='default', plugin=None, default=None):
         """Look up a configuration item"""
         if not self.profiles.has_key(profile):
             # Hitting this generally implies a bug
@@ -677,12 +758,15 @@ class ConfigBase(Borg):
             return(self.profiles[profile][key])
         elif key == 'keybindings':
             return(self.keybindings)
+        # XXXXX
         elif key == 'keycodes':
             return(self.keycodes)
-        elif plugin is not None and self.plugins[plugin].has_key(key):
+        elif plugin and plugin in self.plugins and key in self.plugins[plugin]:
             dbg('ConfigBase::get_item: %s found in plugin %s: %s' % (
                     key, plugin, self.plugins[plugin][key]))
             return(self.plugins[plugin][key])
+        elif default:
+            return default
         else:
             raise KeyError('ConfigBase::get_item: unknown key %s' % key)
 
@@ -715,6 +799,11 @@ class ConfigBase(Borg):
         """Set a whole tree for a plugin"""
         self.plugins[plugin] = tree
 
+    def del_plugin(self, plugin):
+        """Delete a whole tree for a plugin"""
+        if plugin in self.plugins:
+            del self.plugins[plugin]
+
     def add_profile(self, profile):
         """Add a new profile"""
         if profile in self.profiles:
@@ -725,6 +814,13 @@ class ConfigBase(Borg):
     def add_layout(self, name, layout):
         """Add a new layout"""
         if name in self.layouts:
+            return(False)
+        self.layouts[name] = layout
+        return(True)
+
+    def replace_layout(self, name, layout):
+        """Replaces a layout with the given name"""
+        if not name in self.layouts:
             return(False)
         self.layouts[name] = layout
         return(True)
