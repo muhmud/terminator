@@ -42,6 +42,26 @@ class SqlMode(plugin.MenuItem):
         menuitems.append(Gtk.SeparatorMenuItem())
         menuitems.append(sqlMode)
 
+    def psql_operation(self, terminal, code):
+        self.start_operation(terminal, code)
+        self.wait_on_operation()
+        terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+        
+    def start_operation(self, terminal, code):
+        with open('/tmp/buffer-status', 'w') as f: f.write("...")
+        terminal.vte.feed_child_binary(code)
+        
+    def wait_on_operation(self):
+        counter = 0
+        while counter < 50:
+            subprocess.call(['sync'])
+            with open('/tmp/buffer-status', 'r') as f:
+                if f.read() == 'DONE':
+                    break
+                else:
+                    time.sleep(0.1)
+                    counter += 1
+        
     def setMySqlMode(self, _widget, terminal):
         """Set Sql Mode to MySQL"""
         if terminal.keypress_callback != self.mysql_keypress:
@@ -65,40 +85,45 @@ class SqlMode(plugin.MenuItem):
 
     def psql_keypress(self, terminal, event):
         # Check for F5
+        counter = 0
         if (event.keyval == 65474 and event.state == 16):
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x7e')
-            time.sleep(0.2)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            self.psql_operation(terminal, b'\x1b\x5b\x31\x35\x7e')
         # Check for Alt + F1
         if (event.keyval == 65470 and event.state == 24):
             # ^[O1;3P
-            terminal.vte.feed_child_binary(b'\x1b\x4f\x31\x3b\x33\x50')
-            time.sleep(0.2)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            self.psql_operation(terminal, b'\x1b\x4f\x31\x3b\x33\x50')
         # Check for Alt + F2
         if (event.keyval == 65471 and event.state == 24):
             # ^[O1;3Q
-            terminal.vte.feed_child_binary(b'\x1b\x4f\x31\x3b\x33\x51')
-            time.sleep(0.2)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            self.psql_operation(terminal, b'\x1b\x4f\x31\x3b\x33\x51')
         # Check for Alt + F5
         if (event.keyval == 65474 and event.state == 24):
             # ^[[15;3~
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x3b\x33\x7e')
-            time.sleep(0.2)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            self.psql_operation(terminal, b'\x1b\x5b\x31\x35\x3b\x33\x7e')
+        # Check for Alt + F6
+        if (event.keyval == 65475 and event.state == 24):
+            # ^[[17;3~
+            self.psql_operation(terminal, b'\x1b\x5b\x31\x37\x3b\x33\x7e')
+        # Check for Alt + F7
+        if (event.keyval == 65476 and event.state == 24):
+            # ^[[18;3~
+            self.psql_operation(terminal, b'\x1b\x5b\x31\x38\x3b\x33\x7e')
+        # Check for Alt + D
+        if (event.keyval == 100 and event.state == 24):
+            # ^[[24;9{
+            self.psql_operation(terminal, b'\x1b\x5b\x32\x34\x3b\x39\x7b')
+        # Check for Alt + Shift + D
+        if (event.keyval == 68 and event.state == 25):
+            # ^[[24;9}
+            self.psql_operation(terminal, b'\x1b\x5b\x32\x34\x3b\x39\x7d')
         # Check for Alt + Space
         if (event.keyval == 32 and event.state == 24):
-            # ^[ 
-            terminal.vte.feed_child_binary(b'\x1b\x20')
-            time.sleep(0.2)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            # ^[
+            self.psql_operation(terminal, b'\x1b\x20')
         # Check for Ctrl + Enter
         if (event.keyval == 65293 and event.state == 20):
             # ^[[24;9~
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x32\x34\x3b\x39\x7e')
-            time.sleep(0.2)
-            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+            self.psql_operation(terminal, b'\x1b\x5b\x32\x34\x3b\x39\x7e')
 
     def setSQLServerMode(self, _widget, terminal):
         """Set Sql Mode to SQL Server"""
