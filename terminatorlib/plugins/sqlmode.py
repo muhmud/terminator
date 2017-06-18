@@ -4,6 +4,7 @@
 """sqlmode.py - Terminator Plugin creating an editor + sql client in the terminal"""
 
 import time
+import subprocess
 
 from gi.repository import Gtk, GObject
 
