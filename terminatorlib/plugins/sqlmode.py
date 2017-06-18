@@ -45,17 +45,17 @@ class SqlMode(plugin.MenuItem):
     def psql_operation(self, terminal, code):
         self.start_operation(terminal, code)
         self.wait_on_operation()
-        terminal.emit('print', 'next', '\n#q\n\\i /ram/buffer.sql\n')
+        terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
         
     def start_operation(self, terminal, code):
-        with open('/ram/buffer-status', 'w') as f: f.write("...")
+        with open('/tmp/buffer-status', 'w') as f: f.write("...")
         terminal.vte.feed_child_binary(code)
         
     def wait_on_operation(self):
         counter = 0
         while counter < 50:
             subprocess.call(['sync'])
-            with open('/ram/buffer-status', 'r') as f:
+            with open('/tmp/buffer-status', 'r') as f:
                 if f.read() == 'DONE':
                     break
                 else:
