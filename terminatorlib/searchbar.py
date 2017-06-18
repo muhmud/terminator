@@ -1,27 +1,28 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # Terminator by Chris Jones <cmsj@tenshu.net>
 # GPL v2 only
 """searchbar.py - classes necessary to provide a terminal search bar"""
 
-import gtk
-import gobject
+from gi.repository import Gtk, Gdk
+from gi.repository import GObject
 import re
 
 from translation import _
 from config import Config
 
 # pylint: disable-msg=R0904
-class Searchbar(gtk.HBox):
+class Searchbar(Gtk.HBox):
     """Class implementing the Searchbar widget"""
 
     __gsignals__ = {
-        'end-search': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, ()),
+        'end-search': (GObject.SignalFlags.RUN_LAST, None, ()),
     }
 
     entry = None
     reslabel = None
     next = None
     prev = None
+    wrap = None
 
     vte = None
     config = None
@@ -34,32 +35,33 @@ class Searchbar(gtk.HBox):
 
     def __init__(self):
         """Class initialiser"""
-        gtk.HBox.__init__(self)
-        self.__gobject_init__()
+        GObject.GObject.__init__(self)
 
         self.config = Config()
 
+        self.get_style_context().add_class("terminator-terminal-searchbar")
+
         # Search text
-        self.entry = gtk.Entry()
+        self.entry = Gtk.Entry()
         self.entry.set_activates_default(True)
         self.entry.show()
         self.entry.connect('activate', self.do_search)
         self.entry.connect('key-press-event', self.search_keypress)
 
         # Label
-        label = gtk.Label(_('Search:'))
+        label = Gtk.Label(label=_('Search:'))
         label.show()
 
         # Result label
-        self.reslabel = gtk.Label('')
+        self.reslabel = Gtk.Label(label='')
         self.reslabel.show()
 
         # Close Button
-        close = gtk.Button()
-        close.set_relief(gtk.RELIEF_NONE)
+        close = Gtk.Button()
+        close.set_relief(Gtk.ReliefStyle.NONE)
         close.set_focus_on_click(False)
-        icon = gtk.Image()
-        icon.set_from_stock(gtk.STOCK_CLOSE, gtk.ICON_SIZE_MENU)
+        icon = Gtk.Image()
+        icon.set_from_stock(Gtk.STOCK_CLOSE, Gtk.IconSize.MENU)
         close.add(icon)
         close.set_name('terminator-search-close-button')
         if hasattr(close, 'set_tooltip_text'):
@@ -68,26 +70,41 @@ class Searchbar(gtk.HBox):
         close.show_all()
 
         # Next Button
-        self.next = gtk.Button(_('Next'))
+        self.next = Gtk.Button(_('Next'))
         self.next.show()
         self.next.set_sensitive(False)
         self.next.connect('clicked', self.next_search)
 
         # Previous Button
-        self.prev = gtk.Button(_('Prev'))
+        self.prev = Gtk.Button(_('Prev'))
         self.prev.show()
         self.prev.set_sensitive(False)
         self.prev.connect('clicked', self.prev_search)
 
-        self.pack_start(label, False)
-        self.pack_start(self.entry)
-        self.pack_start(self.reslabel, False)
-        self.pack_start(self.prev, False, False)
-        self.pack_start(self.next, False, False)
-        self.pack_end(close, False, False)
+        # Wrap checkbox
+        self.wrap = Gtk.CheckButton(_('Wrap'))
+        self.wrap.show()
+        self.wrap.set_sensitive(True)
+        self.wrap.connect('toggled', self.wrap_toggled)
+
+        self.pack_start(label, False, True, 0)
+        self.pack_start(self.entry, True, True, 0)
+        self.pack_start(self.reslabel, False, True, 0)
+        self.pack_start(self.prev, False, False, 0)
+        self.pack_start(self.next, False, False, 0)
+        self.pack_start(self.wrap, False, False, 0)
+        self.pack_end(close, False, False, 0)
 
         self.hide()
         self.set_no_show_all(True)
+
+    def wrap_toggled(self, toggled):
+        if self.searchrow is None:
+            self.prev.set_sensitive(False)
+            self.next.set_sensitive(False)
+        elif toggled:
+            self.prev.set_sensitive(True)
+            self.next.set_sensitive(True)
 
     def get_vte(self):
         """Find our parent widget"""
@@ -98,9 +115,12 @@ class Searchbar(gtk.HBox):
     # pylint: disable-msg=W0613
     def search_keypress(self, widget, event):
         """Handle keypress events"""
-        key = gtk.gdk.keyval_name(event.keyval)
+        key = Gdk.keyval_name(event.keyval)
         if key == 'Escape':
             self.end_search()
+        else:
+            self.prev.set_sensitive(False)
+            self.next.set_sensitive(False)
 
     def start_search(self):
         """Show ourselves"""
@@ -117,7 +137,7 @@ class Searchbar(gtk.HBox):
             return
 
         if searchtext != self.searchstring:
-            self.searchrow = self.get_vte_buffer_range()[0]
+            self.searchrow = self.get_vte_buffer_range()[0] - 1
             self.searchstring = searchtext
             self.searchre = re.compile(searchtext)
 
@@ -129,42 +149,54 @@ class Searchbar(gtk.HBox):
     def next_search(self, widget):
         """Search forwards and jump to the next result, if any"""
         startrow,endrow = self.get_vte_buffer_range()
+        found = startrow <= self.searchrow and self.searchrow < endrow
+        row = self.searchrow
         while True:
-            if self.searchrow >= endrow:
-                self.searchrow = startrow
-                self.reslabel.set_text(_('No more results'))
-                return
-            buffer = self.vte.get_text_range(self.searchrow, 0,
-                                             self.searchrow+1, 0,
-                                             self.search_character)
+            row += 1
+            if row >= endrow:
+                if found and self.wrap.get_active():
+                    row = startrow - 1
+                else:
+                    self.prev.set_sensitive(found)
+                    self.next.set_sensitive(False)
+                    self.reslabel.set_text(_('No more results'))
+                    return
+            buffer = self.vte.get_text_range(row, 0, row + 1, 0, self.search_character)
 
+            buffer = buffer[0]
+            buffer = buffer[:buffer.find('\n')]
             matches = self.searchre.search(buffer)
             if matches:
+                self.searchrow = row
+                self.prev.set_sensitive(True)
                 self.search_hit(self.searchrow)
-                self.searchrow += 1
                 return
-            self.searchrow += 1
 
-    # FIXME: There is an issue in switching search direction, probably because
-    # we increment/decrement self.searchrow after each search iteration
     def prev_search(self, widget):
         """Jump back to the previous search"""
         startrow,endrow = self.get_vte_buffer_range()
+        found = startrow <= self.searchrow and self.searchrow < endrow
+        row = self.searchrow
         while True:
-            if self.searchrow <= startrow:
-                self.searchrow = endrow
-                self.reslabel.set_text(_('No more results'))
-                return
-            buffer = self.vte.get_text_range(self.searchrow, 0,
-                                             self.searchrow+1, 0,
-                                             self.search_character)
+            row -= 1
+            if row <= startrow:
+                if found and self.wrap.get_active():
+                    row = endrow
+                else:
+                    self.next.set_sensitive(found)
+                    self.prev.set_sensitive(False)
+                    self.reslabel.set_text(_('No more results'))
+                    return
+            buffer = self.vte.get_text_range(row, 0, row + 1, 0, self.search_character)
 
+            buffer = buffer[0]
+            buffer = buffer[:buffer.find('\n')]
             matches = self.searchre.search(buffer)
             if matches:
+                self.searchrow = row
+                self.next.set_sensitive(True)
                 self.search_hit(self.searchrow)
-                self.searchrow -= 1
                 return
-            self.searchrow -= 1
 
     def search_hit(self, row):
         """Update the UI for a search hit"""
@@ -173,14 +205,14 @@ class Searchbar(gtk.HBox):
         self.next.show()
         self.prev.show()
 
-    def search_character(self, widget, col, row, junk):
+    def search_character(self, widget, col, row):
         """We have to have a callback for each character"""
         return(True)
 
     def get_vte_buffer_range(self):
         """Get the range of a vte widget"""
         column, endrow = self.vte.get_cursor_position()
-        if self.config['scrollback_lines'] < 0:
+        if self.config['scrollback_infinite']:
             startrow = 0
         else:
             startrow = max(0, endrow - self.config['scrollback_lines'])
@@ -198,4 +230,4 @@ class Searchbar(gtk.HBox):
         """Return the currently set search term"""
         return(self.entry.get_text())
 
-gobject.type_register(Searchbar)
+GObject.type_register(Searchbar)

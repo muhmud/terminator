@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 #    Terminator.optionparse - Parse commandline options
 #    Copyright (C) 2006-2010  cmsj@tenshu.net
 #
@@ -42,12 +42,14 @@ def parse_options():
     """Parse the command line options"""
     usage = "usage: %prog [options]"
 
+    is_x_terminal_emulator = os.path.basename(sys.argv[0]) == 'x-terminal-emulator'
+
     parser = OptionParser(usage)
 
     parser.add_option('-v', '--version', action='store_true', dest='version',
             help=_('Display program version'))
     parser.add_option('-m', '--maximise', action='store_true', dest='maximise',
-            help=_('Maximise the window'))
+            help=_('Maximize the window'))
     parser.add_option('-f', '--fullscreen', action='store_true',
             dest='fullscreen', help=_('Make the window fill the screen'))
     parser.add_option('-b', '--borderless', action='store_true',
@@ -59,8 +61,16 @@ def parse_options():
     parser.add_option('--geometry', dest='geometry', type='string', 
                       help=_('Set the preferred size and position of the window'
                              '(see X man page)'))
-    parser.add_option('-e', '--command', dest='command', 
-            help=_('Specify a command to execute inside the terminal'))
+    if not is_x_terminal_emulator:
+        parser.add_option('-e', '--command', dest='command', 
+                help=_('Specify a command to execute inside the terminal'))
+    else:
+        parser.add_option('--command', dest='command', 
+                help=_('Specify a command to execute inside the terminal'))
+        parser.add_option('-e', '--execute2', dest='execute', action='callback',
+                callback=execute_cb, 
+                help=_('Use the rest of the command line as a command to '
+                       'execute inside the terminal, and its arguments'))
     parser.add_option('-g', '--config', dest='config', 
                       help=_('Specify a config file'))
     parser.add_option('-x', '--execute', dest='execute', action='callback',
@@ -69,14 +79,14 @@ def parse_options():
                    'inside the terminal, and its arguments'))
     parser.add_option('--working-directory', metavar='DIR',
             dest='working_directory', help=_('Set the working directory'))
-    parser.add_option('-c', '--classname', dest='classname', help=_('Set a \
-custom name (WM_CLASS) property on the window'))
     parser.add_option('-i', '--icon', dest='forcedicon', help=_('Set a custom \
 icon for the window (by file or name)'))
     parser.add_option('-r', '--role', dest='role', 
             help=_('Set a custom WM_WINDOW_ROLE property on the window'))
     parser.add_option('-l', '--layout', dest='layout', 
-                      help=_('Select a layout'))
+            help=_('Launch with the given layout'))
+    parser.add_option('-s', '--select-layout', action='store_true',
+            dest='select', help=_('Select a layout from a list'))
     parser.add_option('-p', '--profile', dest='profile', 
             help=_('Use a different profile as the default'))
     parser.add_option('-u', '--no-dbus', action='store_true', dest='nodbus', 
@@ -122,7 +132,8 @@ icon for the window (by file or name)'))
 
     if options.working_directory:
         if os.path.exists(os.path.expanduser(options.working_directory)):
-            os.chdir(os.path.expanduser(options.working_directory))
+            options.working_directory = os.path.expanduser(options.working_directory)
+            os.chdir(options.working_directory)
         else:
             err('OptionParse::parse_options: %s does not exist' %
                     options.working_directory)

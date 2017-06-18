@@ -1191,12 +1191,6 @@ class ConfigObj(Section):
                  write_empty_values=False, _inspec=False):
         """
         Parse a config file or create a config file object.
-        
-        ``ConfigObj(infile=None, configspec=None, encoding=None,
-                    interpolation=True, raise_errors=False, list_values=True,
-                    create_empty=False, file_error=False, stringify=True,
-                    indent_type=None, default_encoding=None, unrepr=False,
-                    write_empty_values=False, _inspec=False)``
         """
         self._inspec = _inspec
         # init the superclass
@@ -2037,6 +2031,18 @@ class ConfigObj(Section):
                 out.append(line)
                 
         indent_string = self.indent_type * section.depth
+
+        # Do a little sorting for convenience
+        section.scalars = sorted(section.scalars)
+        section.sections = sorted(section.sections)
+        if 'default' in section.scalars:
+            # pop it and move to front
+            section.scalars.remove('default')
+            section.scalars.insert(0, 'default')
+        if 'default' in section.sections:
+            section.sections.remove('default')
+            section.sections.insert(0, 'default')
+
         for entry in (section.scalars + section.sections):
             if entry in section.defaults:
                 # don't write out default values

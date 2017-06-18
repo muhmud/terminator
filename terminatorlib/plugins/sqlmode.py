@@ -4,8 +4,8 @@
 """sqlmode.py - Terminator Plugin creating an editor + sql client in the terminal"""
 
 import time
-import gtk
-import gobject
+
+from gi.repository import Gtk, GObject
 
 import terminatorlib.plugin as plugin
 from terminatorlib.translation import _
@@ -23,24 +23,23 @@ class SqlMode(plugin.MenuItem):
 
     def callback(self, menuitems, menu, terminal):
         """Add our menu items to the menu"""
-        sqlMode = gtk.MenuItem("SQL Mode")
-        sqlModeMenu = gtk.Menu()
+        sqlMode = Gtk.MenuItem("SQL Mode")
+        sqlModeMenu = Gtk.Menu()
         sqlMode.set_submenu(sqlModeMenu)
-        mySql = gtk.CheckMenuItem("MySQL")
-        if terminal.keypress_callback == self.mysql_keypress:
-            mySql.set_active(True)
-        psql = gtk.CheckMenuItem("PostgreSQL")
-        if terminal.keypress_callback == self.psql_keypress:
-            psql.set_active(True)
-        mssql = gtk.CheckMenuItem("SQL Server")
-        if terminal.keypress_callback == self.mssql_keypress:
-            mssql.set_active(True)
+        mySql = Gtk.CheckMenuItem("MySQL")
+        psql = Gtk.CheckMenuItem("PostgreSQL")
+        mssql = Gtk.CheckMenuItem("SQL Server")
+        if terminal.keypress_callback != None:
+            mySql.set_active(terminal.keypress_callback == self.mysql_keypress)
+            psql.set_active(terminal.keypress_callback == self.psql_keypress)
+            mssql.set_active(terminal.keypress_callback == self.mssql_keypress)    
         mySql.connect("activate", self.setMySqlMode, terminal)
         psql.connect("activate", self.setPostgresqlMode, terminal)
         mssql.connect("activate", self.setSQLServerMode, terminal)
         sqlModeMenu.append(mySql)
         sqlModeMenu.append(psql)
         sqlModeMenu.append(mssql)
+        menuitems.append(Gtk.SeparatorMenuItem())
         menuitems.append(sqlMode)
 
     def setMySqlMode(self, _widget, terminal):
@@ -54,7 +53,7 @@ class SqlMode(plugin.MenuItem):
         # Check for F5
         if (event.keyval == 65474):
             terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x7e')
-            time.sleep(0.15)
+            time.sleep(0.2)
             terminal.emit('print', 'next', '\n#q\n\\. /tmp/buffer.sql\n')
 
     def setPostgresqlMode(self, _widget, terminal):
@@ -66,23 +65,40 @@ class SqlMode(plugin.MenuItem):
 
     def psql_keypress(self, terminal, event):
         # Check for F5
-        if (event.keyval == 65474):
+        if (event.keyval == 65474 and event.state == 16):
             terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x7e')
-            time.sleep(0.17)
+            time.sleep(0.2)
             terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
         # Check for Alt + F1
         if (event.keyval == 65470 and event.state == 24):
-            # ^[[1;3P
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x3b\x33\x50')
-            time.sleep(0.17)
+            # ^[O1;3P
+            terminal.vte.feed_child_binary(b'\x1b\x4f\x31\x3b\x33\x50')
+            time.sleep(0.2)
             terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
         # Check for Alt + F2
         if (event.keyval == 65471 and event.state == 24):
-            # ^[[1;3Q
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x3b\x33\x51')
-            time.sleep(0.17)
+            # ^[O1;3Q
+            terminal.vte.feed_child_binary(b'\x1b\x4f\x31\x3b\x33\x51')
+            time.sleep(0.2)
             terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
-            
+        # Check for Alt + F5
+        if (event.keyval == 65474 and event.state == 24):
+            # ^[[15;3~
+            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x3b\x33\x7e')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+        # Check for Alt + Space
+        if (event.keyval == 32 and event.state == 24):
+            # ^[ 
+            terminal.vte.feed_child_binary(b'\x1b\x20')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+        # Check for Ctrl + Enter
+        if (event.keyval == 65293 and event.state == 20):
+            # ^[[24;9~
+            terminal.vte.feed_child_binary(b'\x1b\x5b\x32\x34\x3b\x39\x7e')
+            time.sleep(0.2)
+            terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
 
     def setSQLServerMode(self, _widget, terminal):
         """Set Sql Mode to SQL Server"""
