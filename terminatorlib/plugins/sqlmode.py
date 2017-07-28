@@ -6,6 +6,8 @@
 import time
 import subprocess
 
+import uuid
+
 from gi.repository import Gtk, GObject
 
 import terminatorlib.plugin as plugin
@@ -45,28 +47,49 @@ class SqlMode(plugin.MenuItem):
 
     def psql_operation(self, terminal, code):
         self.start_operation(terminal, code)
-        self.wait_on_operation()
-        terminal.emit('print', 'next', '\n#q\n\\i /tmp/buffer.sql\n')
+        self.wait_on_operation(terminal)
+        terminal.emit('print', 'next', '\n#q\n\\i ' + self.buffer_file(terminal) + '\n')
+
+    def mssql_operation(self, terminal, code):
+        self.start_operation(terminal, code)
+        self.wait_on_operation(terminal)
+        terminal.emit('print', 'next', '\n#q\n\\loop ' + self.buffer_file(terminal) + '\n')
         
     def start_operation(self, terminal, code):
-        with open('/tmp/buffer-status', 'w') as f: f.write("...")
+        with open(self.buffer_status_file(terminal), 'w') as f: f.write("...")
         terminal.vte.feed_child_binary(code)
         
-    def wait_on_operation(self):
+    def wait_on_operation(self, terminal):
         counter = 0
         while counter < 50:
             subprocess.call(['sync'])
-            with open('/tmp/buffer-status', 'r') as f:
+            with open(self.buffer_status_file(terminal), 'r') as f:
                 if f.read() == 'DONE':
                     break
                 else:
                     time.sleep(0.1)
                     counter += 1
+
+    def update_sqltab_file(self, terminal):
+        uuid_string = str(terminal.get_terminal_uuid())
+        dbg(uuid_string)
+        with open('/tmp/sql-tab', 'w') as the_file:
+            the_file.write(uuid_string)
+        
+        # ^[[24;99
+        terminal.vte.feed_child_binary(b'\x1b\x5b\x32\x34\x3b\x39\x39')
+
+    def buffer_file(self, terminal):
+        return "/tmp/buffer." + str(terminal.get_terminal_uuid()) + ".sql"
+
+    def buffer_status_file(self, terminal):
+        return "/tmp/buffer-status." + str(terminal.get_terminal_uuid())
         
     def setMySqlMode(self, _widget, terminal):
         """Set Sql Mode to MySQL"""
         if terminal.keypress_callback != self.mysql_keypress:
             terminal.keypress_callback = self.mysql_keypress
+            self.update_sqltab_file(terminal)
         else:
             terminal.keypress_callback = None
 
@@ -81,6 +104,7 @@ class SqlMode(plugin.MenuItem):
         """Set Sql Mode to PostgreSQL"""
         if terminal.keypress_callback != self.psql_keypress:
             terminal.keypress_callback = self.psql_keypress
+            self.update_sqltab_file(terminal)
         else:
             terminal.keypress_callback = None
 
@@ -130,12 +154,44 @@ class SqlMode(plugin.MenuItem):
         """Set Sql Mode to SQL Server"""
         if terminal.keypress_callback != self.mssql_keypress:
             terminal.keypress_callback = self.mssql_keypress
+            self.update_sqltab_file(terminal)
         else:
             terminal.keypress_callback = None
 
     def mssql_keypress(self, terminal, event):
         # Check for F5
-        if (event.keyval == 65474):
-            terminal.vte.feed_child_binary(b'\x1b\x5b\x31\x35\x7e')
-            time.sleep(0.2)
-            terminal.emit('print', 'next', '\n#q\n\\shell cat /tmp/buffer.sql > /dev/null\n\\loop /tmp/buffer.sql\n')
+        counter = 0
+        if (event.keyval == 65474 and event.state == 16):
+            self.mssql_operation(terminal, b'\x1b\x5b\x31\x35\x7e')
+        # Check for Alt + F1
+        if (event.keyval == 65470 and event.state == 24):
+            # ^[O1;3P
+            self.mssql_operation(terminal, b'\x1b\x4f\x31\x3b\x33\x50')
+        # Check for Alt + F2
+        if (event.keyval == 65471 and event.state == 24):
+            # ^[O1;3Q
+            self.mssql_operation(terminal, b'\x1b\x4f\x31\x3b\x33\x51')
+        # Check for Alt + F5
+        if (event.keyval == 65474 and event.state == 24):
+            # ^[[15;3~
+            self.mssql_operation(terminal, b'\x1b\x5b\x31\x35\x3b\x33\x7e')
+        # Check for Alt + F6
+        if (event.keyval == 65475 and event.state == 24):
+            # ^[[17;3~
+            self.mssql_operation(terminal, b'\x1b\x5b\x31\x37\x3b\x33\x7e')
+        # Check for Alt + F7
+        if (event.keyval == 65476 and event.state == 24):
+            # ^[[18;3~
+            self.mssql_operation(terminal, b'\x1b\x5b\x31\x38\x3b\x33\x7e')
+        # Check for Alt + D
+        if (event.keyval == 100 and event.state == 24):
+            # ^[[24;9{
+            self.mssql_operation(terminal, b'\x1b\x5b\x32\x34\x3b\x39\x7b')
+        # Check for Alt + Space
+        if (event.keyval == 32 and event.state == 24):
+            # ^[
+            self.mssql_operation(terminal, b'\x1b\x20')
+        # Check for Ctrl + Enter
+        if (event.keyval == 65293 and event.state == 20):
+            # ^[[24;9~
+            self.mssql_operation(terminal, b'\x1b\x5b\x32\x34\x3b\x39\x7e')

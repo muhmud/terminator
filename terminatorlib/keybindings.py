@@ -27,6 +27,7 @@ from gi.repository import Gtk, Gdk
 
 # XXXXX
 from util import dbg, err
+import array
 import gtk
 
 class KeymapError(Exception):
@@ -162,12 +163,12 @@ class Keybindings:
     def lookupCode(self, event):
         """Translate a keyboard event into a key code"""
         try:
-            keyval, _egp, _lvl, consumed = self.keymap.translate_keyboard_state(
+            _found, keyval, _egp, _lvl, consumed = self.keymap.translate_keyboard_state(
                                               event.hardware_keycode, 
-                                              event.state & ~Gdk.ModifierType.LOCK_MASK, 
+                                              Gdk.ModifierType(event.get_state() & ~Gdk.ModifierType.LOCK_MASK), 
                                               event.group)
         except TypeError:
-            err ("keycode.lookup failed to translate keyboard event: %s" % 
+            err ("keycode.lookupCode failed to translate keyboard event: %s" % 
                      dir(event))
             return None
         mask = (event.state & ~consumed) & self._codeMasks

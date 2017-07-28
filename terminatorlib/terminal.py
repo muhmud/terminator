@@ -27,6 +27,9 @@ from signalman import Signalman
 import plugin
 from terminatorlib.layoutlauncher import LayoutLauncher
 
+# XXXXX
+import uuid
+
 # pylint: disable-msg=R0904
 class Terminal(Gtk.VBox):
     """Class implementing the VTE widget and its wrappings"""
@@ -115,6 +118,7 @@ class Terminal(Gtk.VBox):
 
     # XXXXX
     keypress_callback = None
+    terminal_uuid = uuid.uuid1()
     
     def __init__(self):
         """Class initialiser"""
@@ -184,6 +188,9 @@ class Terminal(Gtk.VBox):
         self.reconfigure()
         self.vte.set_size(80, 24)
 
+    def get_terminal_uuid(self):
+        return self.terminal_uuid
+        
     def get_vte(self):
         """This simply returns the vte widget we are using"""
         return(self.vte)
@@ -359,6 +366,10 @@ class Terminal(Gtk.VBox):
         self.scrollbar.connect('button-press-event', self.on_buttonpress)
 
         self.cnxids.new(self.vte, 'key-press-event', self.on_keypress)
+
+        # XXXXX
+        self.cnxids.new(self.vte, 'key-release-event', self.on_keyrelease)
+        
         self.cnxids.new(self.vte, 'button-press-event', self.on_buttonpress)
         self.cnxids.new(self.vte, 'scroll-event', self.on_mousewheel)
         self.cnxids.new(self.vte, 'popup-menu', self.popup_menu)
@@ -904,7 +915,7 @@ class Terminal(Gtk.VBox):
         else:
             keycode = self.terminator.keybindings.lookupCode(event)
             if (keycode):
-                self.vte.feed_child_binary(keycode, len(keycode))
+                self.vte.feed_child_binary(keycode)
                 return (True)
 
         # FIXME: This is all clearly wrong. We should be doing this better
@@ -921,6 +932,13 @@ class Terminal(Gtk.VBox):
 
         return(False)
 
+    # XXXXX
+    def on_keyrelease(self, widget, event):
+        if (event.get_state() & Gdk.ModifierType.CONTROL_MASK and event.keyval == 65507):
+            with open('/tmp/emacs-ctrl-up', 'w') as the_file:
+                the_file.write(str(uuid.uuid1()))
+        return(False)
+    
     def on_buttonpress(self, widget, event):
         """Handler for mouse events"""
         # Any button event should grab focus

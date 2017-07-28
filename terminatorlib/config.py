@@ -261,6 +261,10 @@ DEFAULTS = {
                 },
         'plugins': {
         },
+
+        # XXXXX
+        'keycodes': {
+        },
 }
 
 class Config(object):
@@ -505,7 +509,8 @@ class ConfigBase(Borg):
         if self.whined is None:
             self.whined = False
         if self.sections is None:
-            self.sections = ['global_config', 'keybindings', 'profiles',
+            # XXXXX
+            self.sections = ['global_config', 'keybindings', 'keycodes', 'profiles',
                              'layouts', 'plugins']
         if self.global_config is None:
             self.global_config = copy(DEFAULTS['global_config'])
@@ -781,6 +786,9 @@ class ConfigBase(Borg):
             self.profiles[profile][key] = value
         elif key == 'keybindings':
             self.keybindings = value
+        # XXXXX
+        elif key == 'keycodes':
+            self.keycodes = value
         elif plugin is not None:
             if not self.plugins.has_key(plugin):
                 self.plugins[plugin] = {}
