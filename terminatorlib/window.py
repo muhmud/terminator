@@ -905,7 +905,7 @@ class Window(Container, Gtk.Window):
     def print_terminal(self, terminal, direction, msg):
         next = self.find_terminal(terminal, direction)
         if next is not None:
-            next.vte.feed_child(msg, len(msg))
+            next.vte.feed_child(msg)
             
     def create_layout(self, layout):
         """Apply any config items from our layout"""
