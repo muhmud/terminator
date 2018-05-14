@@ -245,6 +245,15 @@ class Terminal(Gtk.VBox):
         self.cnxids.remove_widget(self.vte)
         self.emit('close-term')
         try:
+            # XXXXX
+            if self.vte:
+              try:
+                dbg('have tmux kill this session')
+                self.vte.feed_child("tmux kill-session\n")
+              except Exception, ex:
+                dbg('tmux kill failed: %s' % ex)
+                pass
+            
             dbg('close: killing %d' % self.pid)
             os.kill(self.pid, signal.SIGHUP)
         except Exception, ex:
