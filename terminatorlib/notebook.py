@@ -63,6 +63,10 @@ class Notebook(Container, Gtk.Notebook):
         #self.connect('page-reordered', self.on_page_reordered)
         self.set_scrollable(self.config['scroll_tabbar'])
 
+        # XXXXX
+        # No borders
+        self.set_show_border(False)
+
         if self.config['tab_position'] == 'hidden' or self.config['hide_tabbar']:
             self.set_show_tabs(False)
         else:
